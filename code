@@ -1,0 +1,198 @@
+#include <UTFT.h>
+#include <URTouch.h>
+#include <floatToString.h>
+#include <math.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#define ONE_WIRE_BUS 9
+OneWire ourWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&ourWire);
+
+char test[5];
+float gr;
+float ActTemp;
+float ActPressure;
+int valvePin=8;
+int pressure;
+int valve=0;
+
+extern uint8_t BigFont[];
+extern uint8_t SmallFont[];
+extern uint8_t SevenSegNumFont[];
+
+UTFT    myGLCD(CTE32_R2,38,39,40,41);
+URTouch  myTouch( 6, 5, 4, 3, 2);
+
+void setup()
+{
+  Serial.begin(9600);
+  pinMode(valvePin, OUTPUT);
+  gr = 4.5;
+  ActTemp = measuredTemperature();
+  
+  myGLCD.InitLCD();
+  myGLCD.clrScr();
+  myGLCD.setFont(SmallFont);
+
+  myTouch.InitTouch();
+  myTouch.setPrecision(PREC_MEDIUM);
+  myGLCD.setColor(255, 255, 0);
+  myGLCD.print("Spundaktivist vom Braukombinat", 45, 5);
+  myGLCD.setFont(BigFont);
+  myGLCD.setColor(0, 255, 0);
+  myGLCD.fillRect (30, 40, 80, 90);
+  myGLCD.fillRect (30, 180, 80, 230);
+  //myGLCD.setColor(255, 0, 0);
+  //myGLCD.fillRect (250, 180, 300, 230);
+  //myGLCD.setColor(0, 255, 0);
+  //myGLCD.fillRect (190, 180, 240, 230);
+  myGLCD.setColor(255, 255, 0);
+  myGLCD.print("+", 47, 57);
+  myGLCD.print("-", 47, 197);
+  myGLCD.setFont(SmallFont);
+  myGLCD.print("CO2", 45, 110);
+  myGLCD.setFont(BigFont);
+  myGLCD.print(floatToString(test, gr, 2, 3), 25, 130);
+  myGLCD.setFont(SmallFont);
+  myGLCD.print("gr/l", 40, 155);
+  myGLCD.setFont(SmallFont);
+  myGLCD.print("gemessene", 100, 40);
+  myGLCD.print("Temp. (C):", 100, 56);
+  myGLCD.setFont(BigFont);
+  myGLCD.print(floatToString(test, ActTemp, 2, 3), 230, 48);
+  myGLCD.setFont(SmallFont);
+  myGLCD.print("kalkulierter", 100, 80);
+  myGLCD.print("Druck (bar):", 100, 96);
+  myGLCD.setFont(BigFont);
+  myGLCD.print(floatToString(test, calculatedPressure(ActTemp, gr), 2, 3), 230, 88);
+  myGLCD.setFont(SmallFont);
+  myGLCD.print("aktueller", 100, 120);
+  myGLCD.print("Druck (bar):", 100, 136);
+  myGLCD.setFont(BigFont);
+  myGLCD.print(floatToString(test, measuredPressure(), 2, 3), 230, 128);
+}
+
+float calculatedPressure(float temp, float co2)
+{
+  float result;
+  float co = co2 / 10;
+  result = co/pow(exp(1),(-10.73797+(2617.25/(temp+273.15))))-1.013;
+  return result;
+}
+
+float measuredTemperature()
+{
+float MesTemp;
+sensors.requestTemperatures();
+MesTemp = sensors.getTempCByIndex(0) ;
+return MesTemp;
+}
+
+float measuredPressure()
+{
+float MesPress;
+MesPress = analogRead(A2);
+MesPress=MesPress*4/1023;
+return MesPress;
+Serial.println(MesPress);
+}
+
+void decreasePressure()
+{
+  digitalWrite(valvePin, HIGH);
+  delay(5000);
+  digitalWrite(valvePin, LOW);
+}
+
+void checkAction(float MeasuredPressure, float CalculatedPressure)
+{ 
+  if (MeasuredPressure > CalculatedPressure)
+    {
+    decreasePressure();
+    }
+}
+
+void loop()
+{
+  long x, y;
+  while (myTouch.dataAvailable() == true)
+  {
+    myTouch.read();
+    x = myTouch.getX();
+    y = myTouch.getY();
+    if ((x>=30) and (x<=80) and (y>=180) and (y<=230))
+    {
+      if (gr<=1)
+      {
+        break;
+      }
+      gr = gr - 0.25;
+      ActTemp = measuredTemperature();
+      ActPressure = measuredPressure();
+      myGLCD.setColor(255, 255, 0);
+      myGLCD.setFont(BigFont);
+      myGLCD.print(floatToString(test, gr, 2, 3), 25, 130);
+      myGLCD.setFont(BigFont);
+      myGLCD.print(floatToString(test, calculatedPressure(ActTemp, gr), 2, 3), 230, 88);
+      myGLCD.setFont(BigFont);
+      myGLCD.print(floatToString(test, ActTemp, 2, 3), 230, 48);
+      myGLCD.setFont(BigFont);
+      delay(250);
+    }
+    if ((x>=30) and (x<=80) and (y>=40) and (y<=90))
+    {
+        if (gr>=9)
+      {
+        break;
+      }
+      gr = gr + 0.25;
+      ActTemp = measuredTemperature();
+      ActPressure = measuredPressure();
+      myGLCD.setColor(255, 255, 0);
+      myGLCD.setFont(BigFont);
+      myGLCD.print(floatToString(test, gr, 2, 3), 25, 130);
+      myGLCD.setFont(BigFont);
+      myGLCD.print(floatToString(test, calculatedPressure(ActTemp, gr), 2, 3), 230, 88);
+      myGLCD.setFont(BigFont);
+      myGLCD.print(floatToString(test, ActTemp, 2, 3), 230, 48);
+      myGLCD.setFont(BigFont);
+      delay(250);
+    }
+  }
+
+if ((x>=250) and (x<=300) and (y>=180) and (y<=230))
+    {
+        if (valve==0)
+      {
+        digitalWrite(valvePin, HIGH);
+        valve=1;
+      }
+    delay(250);
+    }
+if ((x>=190) and (x<=240) and (y>=180) and (y<=230))
+    {
+        if (valve==1)
+      {
+        digitalWrite(valvePin, LOW);
+        valve=0;
+      }
+    delay(250);
+    }
+
+  
+      ActTemp = measuredTemperature();
+      ActPressure = measuredPressure();
+      myGLCD.setColor(255, 255, 0);
+      myGLCD.setFont(BigFont);
+      myGLCD.print(floatToString(test, gr, 2, 3), 25, 130);
+      myGLCD.setFont(BigFont);
+      myGLCD.print(floatToString(test, calculatedPressure(ActTemp, gr), 2, 3), 230, 88);
+      myGLCD.setFont(BigFont);
+      myGLCD.print(floatToString(test, ActTemp, 2, 3), 230, 48);
+      myGLCD.setFont(BigFont);
+      myGLCD.print(String(measuredPressure()), 230, 128);
+      myGLCD.setFont(SmallFont);
+      checkAction(ActPressure,calculatedPressure(ActTemp, gr));
+      delay(250);
+  
+}
